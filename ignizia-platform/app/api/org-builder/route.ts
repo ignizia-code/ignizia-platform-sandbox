@@ -1,13 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { OrgNode, OrgEdge } from '@/types/org';
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
-const supabase = createClient(supabaseUrl, supabaseKey);
+let supabaseSingleton: SupabaseClient | null = null;
+function getSupabase(): SupabaseClient {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+  const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '';
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY must be set');
+  }
+  if (!supabaseSingleton) {
+    supabaseSingleton = createClient(supabaseUrl, supabaseKey);
+  }
+  return supabaseSingleton;
+}
 
 const DEFAULT_ORG_ID = '00000000-0000-0000-0000-000000000001';
 
@@ -303,7 +312,7 @@ async function executeTool(
 
       if (node_type === 'department') {
         talentDepartmentId = `dept-${slugify(name)}`;
-        await supabase.from('talent_departments').upsert({
+        await getSupabase().from('talent_departments').upsert({
           org_id: orgId,
           dept_id: talentDepartmentId,
           name,
@@ -319,7 +328,7 @@ async function executeTool(
           (parentNode ? findAncestorDepartmentId(nodes, parentNode.id) : null) ||
           (parentNode?.node_type === 'department' ? `dept-${slugify(parentNode.name)}` : null);
         talentRoleId = `role-${slugify(name)}`;
-        await supabase.from('talent_roles').upsert({
+        await getSupabase().from('talent_roles').upsert({
           org_id: orgId,
           role_id: talentRoleId,
           department_id: parentDeptId,
@@ -330,7 +339,7 @@ async function executeTool(
           updated_at: new Date().toISOString(),
         }, { onConflict: 'org_id,role_id' });
         if (parentDeptId) {
-          await supabase.from('talent_role_department_links').upsert({
+          await getSupabase().from('talent_role_department_links').upsert({
             org_id: orgId,
             role_id: talentRoleId,
             dept_id: parentDeptId,
@@ -348,7 +357,7 @@ async function executeTool(
           return { result: 'Employee/position nodes must be created under a role node.' };
         }
         talentEmployeeId = `emp-${slugify(name)}-${Date.now().toString().slice(-6)}`;
-        await supabase.from('talent_employees').upsert({
+        await getSupabase().from('talent_employees').upsert({
           org_id: orgId,
           employee_id: talentEmployeeId,
           role_id: parentRoleId,
@@ -364,7 +373,7 @@ async function executeTool(
         }, { onConflict: 'org_id,employee_id' });
       }
 
-      const { data: created, error } = await supabase
+      const { data: created, error } = await getSupabase()
         .from('org_nodes')
         .insert({
           org_id: orgId,
@@ -393,7 +402,7 @@ async function executeTool(
       if (reports_to_name) {
         const reportsToNode = findNodeByName(nodes, reports_to_name);
         if (reportsToNode) {
-          const { data: edge } = await supabase
+          const { data: edge } = await getSupabase()
             .from('org_edges')
             .insert({ org_id: orgId, source_id: newNode.id, target_id: reportsToNode.id, edge_type: 'reports_to', metadata: {} })
             .select()
@@ -402,7 +411,7 @@ async function executeTool(
         }
       }
 
-      await supabase.from('org_activity_log').insert({
+      await getSupabase().from('org_activity_log').insert({
         org_id: orgId, action: 'create_node', actor: 'ai', node_id: newNode.id,
         before_state: null, after_state: newNode, summary: `Created ${node_type} "${name}"`,
       });
@@ -428,7 +437,7 @@ async function executeTool(
       if (new_description !== undefined) updates.description = new_description;
       if (is_vacant !== undefined) updates.is_vacant = is_vacant;
 
-      const { data: updated, error } = await supabase
+      const { data: updated, error } = await getSupabase()
         .from('org_nodes')
         .update(updates)
         .eq('id', target.id)
@@ -439,19 +448,19 @@ async function executeTool(
 
       if (new_name) {
         if (target.talent_department_id) {
-          await supabase.from('talent_departments')
+          await getSupabase().from('talent_departments')
             .update({ name: new_name, updated_at: new Date().toISOString() })
             .eq('org_id', orgId)
             .eq('dept_id', target.talent_department_id);
         }
         if (target.talent_role_id) {
-          await supabase.from('talent_roles')
+          await getSupabase().from('talent_roles')
             .update({ name: new_name, updated_at: new Date().toISOString() })
             .eq('org_id', orgId)
             .eq('role_id', target.talent_role_id);
         }
         if (target.talent_employee_id) {
-          await supabase.from('talent_employees')
+          await getSupabase().from('talent_employees')
             .update({ name: new_name, updated_at: new Date().toISOString() })
             .eq('org_id', orgId)
             .eq('employee_id', target.talent_employee_id);
@@ -461,7 +470,7 @@ async function executeTool(
       const updatedNode = updated as OrgNode;
       const updatedNodes = nodes.map(n => n.id === updatedNode.id ? updatedNode : n);
 
-      await supabase.from('org_activity_log').insert({
+      await getSupabase().from('org_activity_log').insert({
         org_id: orgId, action: 'update_node', actor: 'ai', node_id: target.id,
         before_state: target, after_state: updatedNode,
         summary: new_name ? `Renamed "${target.name}" to "${new_name}"` : `Updated "${target.name}"`,
@@ -508,7 +517,7 @@ async function executeTool(
           }
         }
 
-        const { data: updated } = await supabase
+        const { data: updated } = await getSupabase()
           .from('org_nodes')
           .update({ parent_id: effectiveParent.id, updated_at: new Date().toISOString() })
           .eq('id', target.id)
@@ -525,11 +534,11 @@ async function executeTool(
             effectiveParent.talent_department_id ??
             findAncestorDepartmentId(updatedNodes, effectiveParent.id);
           if (derivedDeptId) {
-            await supabase.from('talent_roles')
+            await getSupabase().from('talent_roles')
               .update({ department_id: derivedDeptId, updated_at: new Date().toISOString() })
               .eq('org_id', orgId)
               .eq('role_id', target.talent_role_id);
-            await supabase.from('talent_role_department_links').upsert({
+            await getSupabase().from('talent_role_department_links').upsert({
               org_id: orgId,
               role_id: target.talent_role_id,
               dept_id: derivedDeptId,
@@ -539,7 +548,7 @@ async function executeTool(
         }
 
         if (target.talent_employee_id && effectiveParent.talent_role_id) {
-          await supabase.from('talent_employees')
+          await getSupabase().from('talent_employees')
             .update({ role_id: effectiveParent.talent_role_id, updated_at: new Date().toISOString() })
             .eq('org_id', orgId)
             .eq('employee_id', target.talent_employee_id);
@@ -550,11 +559,11 @@ async function executeTool(
         const reportsTo = findNodeByName(nodes, new_reports_to_name);
         if (!reportsTo) return { result: `Could not find reports-to node "${new_reports_to_name}".` };
 
-        await supabase.from('org_edges').delete()
+        await getSupabase().from('org_edges').delete()
           .eq('source_id', target.id).eq('edge_type', 'reports_to');
         updatedEdges = updatedEdges.filter(e => !(e.source_id === target.id && e.edge_type === 'reports_to'));
 
-        const { data: edge } = await supabase
+        const { data: edge } = await getSupabase()
           .from('org_edges')
           .insert({ org_id: orgId, source_id: target.id, target_id: reportsTo.id, edge_type: 'reports_to', metadata: {} })
           .select()
@@ -564,7 +573,7 @@ async function executeTool(
       }
 
       const summary = `"${target.name}" ${summaryParts.join(' and ')}`;
-      await supabase.from('org_activity_log').insert({
+      await getSupabase().from('org_activity_log').insert({
         org_id: orgId, action: 'move_node', actor: 'ai', node_id: target.id,
         before_state: target, after_state: null, summary,
       });
@@ -598,7 +607,7 @@ async function executeTool(
         // Canonical-first deletes for linked entities
         for (const n of nodesToDelete) {
           if (n.talent_employee_id) {
-            await supabase.from('talent_employees')
+            await getSupabase().from('talent_employees')
               .delete()
               .eq('org_id', orgId)
               .eq('employee_id', n.talent_employee_id);
@@ -607,7 +616,7 @@ async function executeTool(
 
         for (const n of nodesToDelete) {
           if (n.talent_role_id) {
-            const { data: assignedEmployees } = await supabase
+            const { data: assignedEmployees } = await getSupabase()
               .from('talent_employees')
               .select('employee_id')
               .eq('org_id', orgId)
@@ -616,7 +625,7 @@ async function executeTool(
             if ((assignedEmployees ?? []).length > 0) {
               return { result: `Cannot delete role "${n.name}" while employees are assigned. Move or delete employees first.` };
             }
-            await supabase.from('talent_roles')
+            await getSupabase().from('talent_roles')
               .delete()
               .eq('org_id', orgId)
               .eq('role_id', n.talent_role_id);
@@ -625,7 +634,7 @@ async function executeTool(
 
         for (const n of nodesToDelete) {
           if (n.talent_department_id) {
-            const { data: deptRoles } = await supabase
+            const { data: deptRoles } = await getSupabase()
               .from('talent_roles')
               .select('role_id')
               .eq('org_id', orgId)
@@ -634,22 +643,22 @@ async function executeTool(
             if ((deptRoles ?? []).length > 0) {
               return { result: `Cannot delete department "${n.name}" while roles are assigned. Move roles first.` };
             }
-            await supabase.from('talent_departments')
+            await getSupabase().from('talent_departments')
               .delete()
               .eq('org_id', orgId)
               .eq('dept_id', n.talent_department_id);
           }
         }
 
-        await supabase.from('org_edges').delete().or(ids.map(id => `source_id.eq.${id}`).join(','));
-        await supabase.from('org_edges').delete().or(ids.map(id => `target_id.eq.${id}`).join(','));
-        await supabase.from('org_nodes').delete().in('id', ids);
+        await getSupabase().from('org_edges').delete().or(ids.map(id => `source_id.eq.${id}`).join(','));
+        await getSupabase().from('org_edges').delete().or(ids.map(id => `target_id.eq.${id}`).join(','));
+        await getSupabase().from('org_nodes').delete().in('id', ids);
 
         const updatedNodes = nodes.filter(n => !toDelete.has(n.id));
         const updatedEdges = edges.filter(e => !toDelete.has(e.source_id) && !toDelete.has(e.target_id));
 
         const summary = `Deleted "${target.name}" and ${ids.length - 1} child node(s)`;
-        await supabase.from('org_activity_log').insert({
+        await getSupabase().from('org_activity_log').insert({
           org_id: orgId, action: 'delete_node', actor: 'ai', node_id: target.id,
           before_state: target, after_state: null, summary,
         });
@@ -684,7 +693,7 @@ async function executeTool(
 
         if (spec.node_type === 'department') {
           talentDepartmentId = `dept-${slugify(spec.name)}`;
-          await supabase.from('talent_departments').upsert({
+          await getSupabase().from('talent_departments').upsert({
             org_id: orgId,
             dept_id: talentDepartmentId,
             name: spec.name,
@@ -697,7 +706,7 @@ async function executeTool(
             (parentNode ? findAncestorDepartmentId(currentNodes, parentNode.id) : null) ??
             (parentNode?.node_type === 'department' ? `dept-${slugify(parentNode.name)}` : null);
           talentRoleId = `role-${slugify(spec.name)}`;
-          await supabase.from('talent_roles').upsert({
+          await getSupabase().from('talent_roles').upsert({
             org_id: orgId,
             role_id: talentRoleId,
             department_id: deptId,
@@ -707,7 +716,7 @@ async function executeTool(
             updated_at: new Date().toISOString(),
           }, { onConflict: 'org_id,role_id' });
           if (deptId) {
-            await supabase.from('talent_role_department_links').upsert({
+            await getSupabase().from('talent_role_department_links').upsert({
               org_id: orgId,
               role_id: talentRoleId,
               dept_id: deptId,
@@ -718,7 +727,7 @@ async function executeTool(
           const roleId = parentNode?.talent_role_id ?? (parentNode?.node_type === 'role' ? `role-${slugify(parentNode.name)}` : null);
           if (roleId) {
             talentEmployeeId = `emp-${slugify(spec.name)}-${Date.now().toString().slice(-6)}`;
-            await supabase.from('talent_employees').upsert({
+            await getSupabase().from('talent_employees').upsert({
               org_id: orgId,
               employee_id: talentEmployeeId,
               role_id: roleId,
@@ -735,7 +744,7 @@ async function executeTool(
           }
         }
 
-        const { data: created, error } = await supabase
+        const { data: created, error } = await getSupabase()
           .from('org_nodes')
           .insert({
             org_id: orgId,
@@ -765,7 +774,7 @@ async function executeTool(
         if (spec.reports_to_name) {
           const reportsToNode = findNodeByName(currentNodes, spec.reports_to_name);
           if (reportsToNode) {
-            const { data: edge } = await supabase
+            const { data: edge } = await getSupabase()
               .from('org_edges')
               .insert({ org_id: orgId, source_id: newNode.id, target_id: reportsToNode.id, edge_type: 'reports_to', metadata: {} })
               .select()
@@ -776,7 +785,7 @@ async function executeTool(
       }
 
       const summary = `Created ${createdIds.length} nodes: ${createdNames.join(', ')}`;
-      await supabase.from('org_activity_log').insert({
+      await getSupabase().from('org_activity_log').insert({
         org_id: orgId, action: 'bulk_create', actor: 'ai', node_id: null,
         before_state: null, after_state: { createdIds, createdNames }, summary,
       });
@@ -829,8 +838,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'messages array required' }, { status: 400 });
     }
 
-    const { data: nodeRows } = await supabase.from('org_nodes').select('*').eq('org_id', orgId).order('display_order');
-    const { data: edgeRows } = await supabase.from('org_edges').select('*').eq('org_id', orgId);
+    const { data: nodeRows } = await getSupabase().from('org_nodes').select('*').eq('org_id', orgId).order('display_order');
+    const { data: edgeRows } = await getSupabase().from('org_edges').select('*').eq('org_id', orgId);
 
     let nodes = (nodeRows ?? []) as OrgNode[];
     let edges = (edgeRows ?? []) as OrgEdge[];

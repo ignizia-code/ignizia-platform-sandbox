@@ -1,5 +1,5 @@
-# Sandbox: only the platform app is tracked; Talent Studio is deployed separately.
-Talent-Studio/
+# Sandbox: only ignore the separate microservice clone at repo root (not platform UI paths like .../talent-studio/).
+/Talent-Studio/
 
 # Local / editor
 .claude/
