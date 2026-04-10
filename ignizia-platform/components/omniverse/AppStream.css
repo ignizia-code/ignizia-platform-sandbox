@@ -1,0 +1,67 @@
+/*
+ * SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+ * SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+ */
+
+/* Host: flex center so viewport fits without cropping; full stream always visible */
+.omniverse-viewer-host {
+    pointer-events: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    container-type: size;
+}
+
+/* Viewport: 16:9 box that fits within host; full content visible, no top/bottom crop */
+.omniverse-viewer-viewport {
+    pointer-events: auto;
+    position: relative;
+    aspect-ratio: 16 / 9;
+    overflow: hidden;
+    width: 100%;
+    height: auto;
+}
+
+/* Container wider than 16:9: constrain by height so we don't overflow vertically */
+@container (min-aspect-ratio: 16/9) {
+    .omniverse-viewer-viewport {
+        width: auto;
+        height: 100%;
+    }
+}
+
+/* Container narrower than 16:9: constrain by width so we don't overflow horizontally */
+@container (max-aspect-ratio: 16/9) {
+    .omniverse-viewer-viewport {
+        width: 100%;
+        height: auto;
+    }
+}
+
+#main-div.omniverse-stream-container,
+.omniverse-stream-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+    contain: layout paint;
+    will-change: auto;
+}
+
+.omniverse-stream-container video {
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    object-position: center center;
+    background-color: transparent;
+}
+
+#streamonly-wrapper.omniverse-viewer-viewport {
+    overflow: hidden;
+}

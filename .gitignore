@@ -1,0 +1,6 @@
+# Sandbox: only the platform app is tracked; Talent Studio is deployed separately.
+Talent-Studio/
+
+# Local / editor
+.claude/
+nul

@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  /* IGNIZIA brand palette */
+  --color-brand-navy: #063472;
+  --color-brand-pink: #E8347E;
+  --color-brand-green: #2DC37C;
+  --color-brand-blue: #06BAF6;
+  --color-brand-orange: #FAB61F;
+  --color-brand-yellow: #FAE934;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+}
+
+.material-icons-round {
+  vertical-align: middle;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+
+/* Auth page entrance animations (raw CSS for reliability) */
+@keyframes auth-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.auth-slide-up {
+  opacity: 0;
+  animation: auth-slide-up 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.auth-slide-up-1 { animation-delay: 0.06s; }
+.auth-slide-up-2 { animation-delay: 0.12s; }
+.auth-slide-up-3 { animation-delay: 0.18s; }
+.auth-slide-up-4 { animation-delay: 0.24s; }
+.auth-slide-up-5 { animation-delay: 0.3s; }
+
+/* ---- Login screen dark theme effects ---- */
+
+/* Subtle circuit-board grid pattern */
+.login-grid-pattern {
+  background-image:
+    linear-gradient(rgba(6, 186, 246, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(6, 186, 246, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+/* Pulsing ambient glow for logo */
+@keyframes logo-pulse {
+  0%, 100% {
+    box-shadow: 0 0 30px rgba(6, 186, 246, 0.15), 0 0 60px rgba(6, 186, 246, 0.08);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(6, 186, 246, 0.25), 0 0 80px rgba(6, 186, 246, 0.12);
+  }
+}
+
+.logo-glow {
+  animation: logo-pulse 3s ease-in-out infinite;
+}
+
+/* Scan line for system boot overlay */
+@keyframes scan-line {
+  0% { transform: translateY(-100vh); }
+  100% { transform: translateY(100vh); }
+}
+
+.scan-line {
+  animation: scan-line 0.8s ease-in-out forwards;
+}
+
+/* Horizontal line expand */
+@keyframes line-expand {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.line-expand {
+  animation: line-expand 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+/* Typewriter cursor blink */
+@keyframes cursor-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+.cursor-blink::after {
+  content: '|';
+  animation: cursor-blink 0.8s step-end infinite;
+  color: #06BAF6;
+  margin-left: 2px;
+}

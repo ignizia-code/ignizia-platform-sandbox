@@ -1,0 +1,24 @@
+name: Fix Commit Author for Vercel
+
+on:
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: write
+
+jobs:
+  fix-author:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Rewrite commit author to Vercel owner
+        run: |
+          git config user.email "ignizia.ai@gmail.com"
+          git config user.name "Vercel Deploy"
+          git commit --amend --no-edit --author="Vercel Deploy <ignizia.ai@gmail.com>"
+          git push --force-with-lease origin HEAD:${{ github.ref_name }}

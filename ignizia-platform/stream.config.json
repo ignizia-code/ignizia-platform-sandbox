@@ -1,0 +1,15 @@
+{
+  "$comment": "source can be 'gfn', 'local' or 'stream'",
+  "source": "local",
+  "stream": { "appServer": "", "streamServer": "" },
+  "gfn": { "catalogClientId": "", "clientId": "", "cmsId": 0 },
+  "local": {
+    "$comment": "Higher resolution gives Omniverse UI more pixel space; reduce to 1280x720 if GPU load is high.",
+    "server": "127.0.0.1",
+    "signalingPort": 49100,
+    "mediaPort": null,
+    "width": 1920,
+    "height": 1080,
+    "fps": 30
+  }
+}
